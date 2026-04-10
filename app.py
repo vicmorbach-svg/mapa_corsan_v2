@@ -16,43 +16,39 @@ st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução 
 
 @st.cache_data
 def load_ibge_data():
-    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 4709)"""
-    # Tabela 4709 (Domicílios). Variável 93 (Total). N6/all (Brasil todo). P/2022 (Ano exato).
-    url = "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"
-
+    """Busca Domicílios e Saneamento no Censo 2022 via API do SIDRA"""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     try:
-        resposta = requests.get(url, headers=headers)
+        # 1. Busca o Total de Domicílios (Tabela 4709)
+        url_dom = "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"
+        resp_dom = requests.get(url_dom, headers=headers).json()
+        df_dom = pd.DataFrame([{'code_muni': i['D1C'], 'Total_Domicilios': i['V']} for i in resp_dom[1:]])
 
-        if resposta.status_code != 200:
-            st.warning(f"⚠️ Aviso: Não foi possível carregar dados do IBGE. Motivo: {resposta.text}")
-            return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
+        # 2. Busca Domicílios com Esgoto na Rede Geral (Tabela 9814, Categoria 330245)
+        url_esgoto = "https://apisidra.ibge.gov.br/values/t/9814/n6/all/v/10612/p/2022/c11512/330245"
+        resp_esgoto = requests.get(url_esgoto, headers=headers).json()
+        df_esgoto = pd.DataFrame([{'code_muni': i['D1C'], 'Domicilios_Esgoto': i['V']} for i in resp_esgoto[1:]])
 
-        dados_json = resposta.json()
+        # 3. Junta as duas tabelas
+        df_final = df_dom.merge(df_esgoto, on='code_muni', how='left')
 
-        lista_limpa = []
-        for item in dados_json[1:]:
-            lista_limpa.append({
-                'code_muni': item['D1C'],
-                'Total_Domicilios': item['V']
-            })
+        # 4. Converte para números e calcula a Porcentagem de Cobertura
+        df_final['Total_Domicilios'] = pd.to_numeric(df_final['Total_Domicilios'], errors='coerce')
+        df_final['Domicilios_Esgoto'] = pd.to_numeric(df_final['Domicilios_Esgoto'], errors='coerce')
 
-        df_dom = pd.DataFrame(lista_limpa)
-        df_dom['Total_Domicilios'] = pd.to_numeric(df_dom['Total_Domicilios'], errors='coerce')
-        df_dom['code_muni'] = df_dom['code_muni'].astype(str)
+        df_final['Cobertura_Esgoto_%'] = (df_final['Domicilios_Esgoto'] / df_final['Total_Domicilios']) * 100
+        df_final['Cobertura_Esgoto_%'] = df_final['Cobertura_Esgoto_%'].round(1) # Arredonda para 1 casa decimal
 
-        return df_dom
+        df_final['code_muni'] = df_final['code_muni'].astype(str)
+
+        return df_final
 
     except Exception as e:
         st.warning(f"⚠️ Erro de conexão com o IBGE: {e}")
-        return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
-
-    except Exception as e:
-        st.warning(f"⚠️ Erro de conexão com o IBGE: {e}")
-        return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
+        return pd.DataFrame(columns=['code_muni', 'Total_Domicilios', 'Cobertura_Esgoto_%'])
 
 @st.cache_data
 def load_data():
