@@ -16,37 +16,40 @@ st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução 
 
 @st.cache_data
 def load_ibge_data():
-    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 4714)"""
-    # URL blindada: Tabela 4714, Variável 10612 (Domicílios), Ano 2022, Estado 43 (RS)
-    url = "https://apisidra.ibge.gov.br/values/t/4714/n6/in/n3/43/v/10612/p/2022"
+    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 6579)"""
+    # Tabela 6579 é a mais estável do Censo 2022. Variável 10612 = Domicílios.
+    url = "https://apisidra.ibge.gov.br/values/t/6579/n6/in/n3/43/v/10612"
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    resposta = requests.get(url, headers=headers)
+    try:
+        resposta = requests.get(url, headers=headers)
 
-    if resposta.status_code != 200:
-        raise Exception(f"O servidor do IBGE recusou a conexão (Erro {resposta.status_code}).")
+        # Se der erro 400, mostra o motivo exato na tela e retorna uma tabela vazia para não quebrar o app
+        if resposta.status_code != 200:
+            st.warning(f"⚠️ Aviso: Não foi possível carregar dados do IBGE. Motivo: {resposta.text}")
+            return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
 
-    dados_json = resposta.json()
+        dados_json = resposta.json()
 
-    # O SIDRA retorna a primeira linha como texto descritivo, então pulamos ela (dados_json[1:])
-    # D1C = Código do Município | V = Valor numérico
-    lista_limpa = []
-    for item in dados_json[1:]:
-        lista_limpa.append({
-            'code_muni': item['D1C'],
-            'Total_Domicilios': item['V']
-        })
+        lista_limpa = []
+        for item in dados_json[1:]:
+            lista_limpa.append({
+                'code_muni': item['D1C'],
+                'Total_Domicilios': item['V']
+            })
 
-    df_dom = pd.DataFrame(lista_limpa)
+        df_dom = pd.DataFrame(lista_limpa)
+        df_dom['Total_Domicilios'] = pd.to_numeric(df_dom['Total_Domicilios'], errors='coerce')
+        df_dom['code_muni'] = df_dom['code_muni'].astype(str)
 
-    # Garante que os tipos de dados estão corretos para o cruzamento
-    df_dom['Total_Domicilios'] = pd.to_numeric(df_dom['Total_Domicilios'], errors='coerce')
-    df_dom['code_muni'] = df_dom['code_muni'].astype(str)
+        return df_dom
 
-    return df_dom
+    except Exception as e:
+        st.warning(f"⚠️ Erro de conexão com o IBGE: {e}")
+        return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
 
 @st.cache_data
 def load_data():
