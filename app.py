@@ -16,9 +16,9 @@ st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução 
 
 @st.cache_data
 def load_ibge_data():
-    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 6579)"""
-    # Tabela 6579 é a mais estável do Censo 2022. Variável 10612 = Domicílios.
-    url = "https://apisidra.ibge.gov.br/values/t/6579/n6/all/v/10612/p/last"
+    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 4709)"""
+    # Tabela 4709 (Domicílios). Variável 93 (Total). N6/all (Brasil todo). P/2022 (Ano exato).
+    url = "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -27,7 +27,6 @@ def load_ibge_data():
     try:
         resposta = requests.get(url, headers=headers)
 
-        # Se der erro 400, mostra o motivo exato na tela e retorna uma tabela vazia para não quebrar o app
         if resposta.status_code != 200:
             st.warning(f"⚠️ Aviso: Não foi possível carregar dados do IBGE. Motivo: {resposta.text}")
             return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
@@ -46,6 +45,10 @@ def load_ibge_data():
         df_dom['code_muni'] = df_dom['code_muni'].astype(str)
 
         return df_dom
+
+    except Exception as e:
+        st.warning(f"⚠️ Erro de conexão com o IBGE: {e}")
+        return pd.DataFrame(columns=['code_muni', 'Total_Domicilios'])
 
     except Exception as e:
         st.warning(f"⚠️ Erro de conexão com o IBGE: {e}")
