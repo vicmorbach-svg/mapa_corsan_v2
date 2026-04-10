@@ -18,7 +18,7 @@ st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução 
 def load_ibge_data():
     """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 6579)"""
     # Tabela 6579 é a mais estável do Censo 2022. Variável 10612 = Domicílios.
-    url = "https://apisidra.ibge.gov.br/values/t/6579/n6/in/n3/43/v/10612"
+    url = "https://apisidra.ibge.gov.br/values/t/6579/n6/all/v/10612/p/last"
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
