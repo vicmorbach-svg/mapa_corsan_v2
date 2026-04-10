@@ -16,11 +16,10 @@ st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução 
 
 @st.cache_data
 def load_ibge_data():
-    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 4709)"""
-    # URL corrigida: removido o /v/all que causava o Erro 400
-    url = "https://apisidra.ibge.gov.br/values/t/4709/n6/in/n3/43/p/last"
+    """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 4714)"""
+    # URL blindada: Tabela 4714, Variável 10612 (Domicílios), Ano 2022, Estado 43 (RS)
+    url = "https://apisidra.ibge.gov.br/values/t/4714/n6/in/n3/43/v/10612/p/2022"
 
-    # Mantemos o disfarce para não sermos bloqueados
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
@@ -30,13 +29,20 @@ def load_ibge_data():
     if resposta.status_code != 200:
         raise Exception(f"O servidor do IBGE recusou a conexão (Erro {resposta.status_code}).")
 
-    df_ibge = pd.DataFrame(resposta.json())
-    df_ibge.columns = df_ibge.iloc[0] 
-    df_ibge = df_ibge[1:]
+    dados_json = resposta.json()
 
-    df_dom = df_ibge[['Município (Código)', 'Valor']].copy()
-    df_dom.columns = ['code_muni', 'Total_Domicilios']
+    # O SIDRA retorna a primeira linha como texto descritivo, então pulamos ela (dados_json[1:])
+    # D1C = Código do Município | V = Valor numérico
+    lista_limpa = []
+    for item in dados_json[1:]:
+        lista_limpa.append({
+            'code_muni': item['D1C'],
+            'Total_Domicilios': item['V']
+        })
 
+    df_dom = pd.DataFrame(lista_limpa)
+
+    # Garante que os tipos de dados estão corretos para o cruzamento
     df_dom['Total_Domicilios'] = pd.to_numeric(df_dom['Total_Domicilios'], errors='coerce')
     df_dom['code_muni'] = df_dom['code_muni'].astype(str)
 
