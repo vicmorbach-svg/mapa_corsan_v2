@@ -7,9 +7,9 @@ import plotly.express as px
 import io
 import requests # Nova biblioteca para acessar a API do IBGE
 
-st.set_page_config(page_title="Mapa de Diretorias - RS", layout="wide")
+st.set_page_config(page_title="Mapa Corsan", layout="wide")
 
-st.title("🗺️ Mapa de Reestruturação - Diretorias do RS")
+st.title("🗺️ Mapa diretorias Corsan")
 st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução nas abas seguintes.")
 
 # --- FUNÇÕES DE CARREGAMENTO DE DADOS ---
@@ -17,36 +17,28 @@ st.markdown("Explore o mapa interativo ou baixe as versões em alta resolução 
 @st.cache_data
 def load_ibge_data():
     """Busca o Total de Domicílios no Censo 2022 via API do SIDRA (Tabela 4709)"""
-    # URL com /v/all adicionado para garantir a formatação correta da requisição
-    url = "https://apisidra.ibge.gov.br/values/t/4709/n6/in/n3/43/v/all/p/last"
+    # URL corrigida: removido o /v/all que causava o Erro 400
+    url = "https://apisidra.ibge.gov.br/values/t/4709/n6/in/n3/43/p/last"
 
-    # O SEGREDO AQUI: Disfarçar o Python como se fosse um navegador real
+    # Mantemos o disfarce para não sermos bloqueados
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    # Faz a requisição enviando o "disfarce"
     resposta = requests.get(url, headers=headers)
 
-    # Verifica se a resposta foi um sucesso (código 200)
     if resposta.status_code != 200:
         raise Exception(f"O servidor do IBGE recusou a conexão (Erro {resposta.status_code}).")
 
-    # Converte o JSON da API para DataFrame
     df_ibge = pd.DataFrame(resposta.json())
-    df_ibge.columns = df_ibge.iloc[0] # A primeira linha contém os nomes das colunas
+    df_ibge.columns = df_ibge.iloc[0] 
     df_ibge = df_ibge[1:]
 
-    # Filtra apenas o Código do Município e o Valor
     df_dom = df_ibge[['Município (Código)', 'Valor']].copy()
     df_dom.columns = ['code_muni', 'Total_Domicilios']
 
-    # Limpeza dos dados para garantir que são números
     df_dom['Total_Domicilios'] = pd.to_numeric(df_dom['Total_Domicilios'], errors='coerce')
     df_dom['code_muni'] = df_dom['code_muni'].astype(str)
-
-    # Como puxamos todas as variáveis da tabela, agrupamos para pegar o valor máximo (que é o Total Geral da cidade)
-    df_dom = df_dom.groupby('code_muni')['Total_Domicilios'].max().reset_index()
 
     return df_dom
 
