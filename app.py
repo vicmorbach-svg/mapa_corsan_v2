@@ -46,20 +46,22 @@ def load_ibge_data():
             st.warning(f"⚠️ Erro na requisição de {nome_valor}: {e}")
             return pd.DataFrame(columns=['code_muni', nome_valor])
 
-    # 1. Domicílios (Tabela 4709)
+        # 1. Domicílios (Tabela 4709) - Essa funcionou, mantemos igual
     url_dom = "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"
     df_dom = extrair_dados(url_dom, 'Total_Domicilios')
 
-    time.sleep(1.5) # Pausa um pouco maior para evitar bloqueio
+    time.sleep(1.5) 
 
     # 2. Esgoto - Rede Geral (Tabela 9814)
-    url_esgoto = "https://apisidra.ibge.gov.br/values/t/9814/n6/all/v/10612/p/2022/c11512/330245"
+    # URL simplificada: removemos /v/ e /p/ para evitar o Erro 400
+    url_esgoto = "https://apisidra.ibge.gov.br/values/t/9814/n6/all/c11512/330245"
     df_esgoto = extrair_dados(url_esgoto, 'Domicilios_Esgoto')
 
-    time.sleep(1.5) # Pausa um pouco maior para evitar bloqueio
+    time.sleep(1.5) 
 
     # 3. Água - Rede Geral (Tabela 9813)
-    url_agua = "https://apisidra.ibge.gov.br/values/t/9813/n6/all/v/10612/p/2022/c11511/330227"
+    # URL simplificada: removemos /v/ e /p/ para evitar o Erro 400
+    url_agua = "https://apisidra.ibge.gov.br/values/t/9813/n6/all/c11511/330227"
     df_agua = extrair_dados(url_agua, 'Domicilios_Agua')
 
     if df_dom.empty:
