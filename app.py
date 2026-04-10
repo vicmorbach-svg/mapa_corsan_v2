@@ -19,11 +19,16 @@ def load_ibge_data():
     """Busca Domicílios, Água e Esgoto no IBGE com trava de segurança"""
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
+    # Colunas padrão caso o IBGE fique fora do ar
+    colunas_seguranca = ['code_muni', 'Total_Domicilios', 'Cobertura_Agua_%', 'Cobertura_Esgoto_%']
+
     try:
         # 1. Domicílios (Tabela 4709)
         url_dom = "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"
         r_dom = requests.get(url_dom, headers=headers)
-        if r_dom.status_code != 200: return pd.DataFrame()
+        if r_dom.status_code != 200: 
+            return pd.DataFrame(columns=colunas_seguranca)
+
         df_dom = pd.DataFrame([{'code_muni': i['D1C'], 'Total_Domicilios': i['V']} for i in r_dom.json()[1:]])
 
         time.sleep(1) # Pausa de segurança
@@ -31,21 +36,22 @@ def load_ibge_data():
         # 2. Esgoto - Rede Geral (Tabela 9814)
         url_esgoto = "https://apisidra.ibge.gov.br/values/t/9814/n6/all/v/10612/p/2022/c11512/330245"
         r_esgoto = requests.get(url_esgoto, headers=headers)
-        df_esgoto = pd.DataFrame([{'code_muni': i['D1C'], 'Domicilios_Esgoto': i['V']} for i in r_esgoto.json()[1:]]) if r_esgoto.status_code == 200 else pd.DataFrame()
+        df_esgoto = pd.DataFrame([{'code_muni': i['D1C'], 'Domicilios_Esgoto': i['V']} for i in r_esgoto.json()[1:]]) if r_esgoto.status_code == 200 else pd.DataFrame(columns=['code_muni', 'Domicilios_Esgoto'])
 
         time.sleep(1) # Pausa de segurança
 
         # 3. Água - Rede Geral (Tabela 9813)
         url_agua = "https://apisidra.ibge.gov.br/values/t/9813/n6/all/v/10612/p/2022/c11511/330227"
         r_agua = requests.get(url_agua, headers=headers)
-        df_agua = pd.DataFrame([{'code_muni': i['D1C'], 'Domicilios_Agua': i['V']} for i in r_agua.json()[1:]]) if r_agua.status_code == 200 else pd.DataFrame()
+        df_agua = pd.DataFrame([{'code_muni': i['D1C'], 'Domicilios_Agua': i['V']} for i in r_agua.json()[1:]]) if r_agua.status_code == 200 else pd.DataFrame(columns=['code_muni', 'Domicilios_Agua'])
 
         # Junta todas as tabelas
         df_final = df_dom.merge(df_esgoto, on='code_muni', how='left').merge(df_agua, on='code_muni', how='left')
 
         # Converte para números
         for col in ['Total_Domicilios', 'Domicilios_Esgoto', 'Domicilios_Agua']:
-            df_final[col] = pd.to_numeric(df_final[col], errors='coerce')
+            if col in df_final.columns:
+                df_final[col] = pd.to_numeric(df_final[col], errors='coerce')
 
         # Calcula as porcentagens
         df_final['Cobertura_Esgoto_%'] = (df_final['Domicilios_Esgoto'] / df_final['Total_Domicilios']) * 100
@@ -58,7 +64,7 @@ def load_ibge_data():
         return df_final
     except Exception as e:
         st.warning(f"⚠️ Erro ao processar dados do IBGE: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=colunas_seguranca)
 
 @st.cache_data
 def load_data():
