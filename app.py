@@ -16,21 +16,41 @@ st.title("🗺️ Mapa de Infraestrutura e Diretorias - RS")
 
 @st.cache_data
 def load_ibge_data():
-    """Busca Domicílios, Água e Esgoto revelando o erro exato do IBGE"""
+    """Busca Domicílios, Água e Esgoto descobrindo os códigos do IBGE dinamicamente"""
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     colunas_seguranca = ['code_muni', 'Total_Domicilios', 'Cobertura_Agua_%', 'Cobertura_Esgoto_%']
 
+    def descobrir_url(tabela, termo_categoria):
+        """Lê o dicionário da tabela no IBGE e monta a URL com os códigos corretos de hoje"""
+        try:
+            # Acessa os metadados (o manual) da tabela
+            meta = requests.get(f"https://apisidra.ibge.gov.br/desctab/{tabela}", headers=headers).json()
+
+            # Pega o ID da primeira classificação disponível
+            id_class = meta['classificacoes'][0]['id']
+
+            # Procura o ID da categoria que contém a palavra "rede geral"
+            id_cat = None
+            for cat in meta['classificacoes'][0]['categorias']:
+                if termo_categoria.lower() in cat['nome'].lower():
+                    id_cat = cat['id']
+                    break
+
+            if id_class and id_cat:
+                # Monta a URL blindada com os códigos descobertos na hora
+                return f"https://apisidra.ibge.gov.br/values/t/{tabela}/n6/all/v/all/p/last/c{id_class}/{id_cat}"
+        except:
+            pass
+        return None
+
     def extrair_dados(url, nome_valor):
+        if not url: return pd.DataFrame(columns=['code_muni', nome_valor])
         try:
             r = requests.get(url, headers=headers)
-            if r.status_code != 200:
-                # A MÁGICA ESTÁ AQUI: Vamos imprimir a resposta exata do IBGE
-                st.error(f"⚠️ Erro em {nome_valor}: {r.text}")
-                return pd.DataFrame(columns=['code_muni', nome_valor])
+            if r.status_code != 200: return pd.DataFrame(columns=['code_muni', nome_valor])
 
             dados = r.json()
-            if len(dados) <= 1:
-                return pd.DataFrame(columns=['code_muni', nome_valor])
+            if len(dados) <= 1: return pd.DataFrame(columns=['code_muni', nome_valor])
 
             cabecalho = dados[0]
             chave_muni = 'D1C'
@@ -39,25 +59,20 @@ def load_ibge_data():
                     chave_muni = k
                     break
 
-            df = pd.DataFrame([{'code_muni': i[chave_muni], nome_valor: i['V']} for i in dados[1:]])
-            return df
-        except Exception as e:
+            return pd.DataFrame([{'code_muni': i[chave_muni], nome_valor: i['V']} for i in dados[1:]])
+        except:
             return pd.DataFrame(columns=['code_muni', nome_valor])
 
-    # 1. Domicílios (Tabela 4709) - Funciona perfeitamente
+    # 1. Domicílios (Tabela 4709) - URL fixa pois já sabemos que funciona
     url_dom = "https://apisidra.ibge.gov.br/values/t/4709/n6/all/v/93/p/2022"
     df_dom = extrair_dados(url_dom, 'Total_Domicilios')
 
-    time.sleep(1) 
-
-    # 2. Esgoto (Tabela 9814) - URL padrão para forçar o erro descritivo
-    url_esgoto = "https://apisidra.ibge.gov.br/values/t/9814/n6/all/v/10612/p/2022/c11512/330245"
+    # 2. Esgoto (Tabela 9814) - Descobre a URL dinamicamente
+    url_esgoto = descobrir_url("9814", "rede geral")
     df_esgoto = extrair_dados(url_esgoto, 'Domicilios_Esgoto')
 
-    time.sleep(1) 
-
-    # 3. Água (Tabela 9813) - URL padrão para forçar o erro descritivo
-    url_agua = "https://apisidra.ibge.gov.br/values/t/9813/n6/all/v/10612/p/2022/c11511/330227"
+    # 3. Água (Tabela 9813) - Descobre a URL dinamicamente
+    url_agua = descobrir_url("9813", "rede geral")
     df_agua = extrair_dados(url_agua, 'Domicilios_Agua')
 
     if df_dom.empty:
@@ -71,7 +86,10 @@ def load_ibge_data():
         if col in df_final.columns:
             df_final[col] = pd.to_numeric(df_final[col], errors='coerce').fillna(0)
 
+    # Evita erro de divisão por zero
     df_final['Total_Domicilios_Calc'] = df_final['Total_Domicilios'].replace(0, 1)
+
+    # Calcula as porcentagens
     df_final['Cobertura_Esgoto_%'] = (df_final['Domicilios_Esgoto'] / df_final['Total_Domicilios_Calc']) * 100
     df_final['Cobertura_Agua_%'] = (df_final['Domicilios_Agua'] / df_final['Total_Domicilios_Calc']) * 100
 
